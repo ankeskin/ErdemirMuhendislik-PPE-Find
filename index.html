@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Erdemir Mühendislik KKD Belirleme Oyunu</title>
+    <meta name="description" content="Erdemir Mühendislik (ERD-ISD) KKD belirleme eğitim simülasyonu.">
+
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* Özel Animasyonlar ve Scrollbar */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .9; transform: scale(1.02); }
+        }
+        .animate-fade-in-up { animation: fadeInUp 0.3s ease-out forwards; }
+        .animate-pulse-once { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        
+        .inventory-scroll::-webkit-scrollbar { width: 6px; }
+        .inventory-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .inventory-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .inventory-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen font-sans text-slate-800">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- İKON TANIMLAMALARI (SVG) ---
+        const ShieldCheck = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" /><path d="m9 12 2 2 4-4" /></svg>;
+        const AlertTriangle = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>;
+        const CheckCircle2 = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg>;
+        const XCircle = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></svg>;
+        const ArrowRight = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>;
+        const RotateCcw = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12" /><path d="M3 3v9h9" /></svg>;
+        const Lightbulb = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>;
+
+        // --- TÜM DONANIMLAR (STANDART VE SPESİFİK) ---
+        const allItems = [
+          { id: "baret", name: "Baret (EN 397)", icon: "👷", category: "standart" },
+          { id: "is_elbisesi", name: "İş Elbisesi (EN 340)", icon: "🦺", category: "standart" },
+          { id: "gozluk", name: "Koruyucu Gözlük (EN 166)", icon: "🥽", category: "standart" },
+          { id: "is_botu", name: "İş Botu (EN 20345)", icon: "🥾", category: "standart" },
+          { id: "mekanik_eldiven", name: "Mekanik Eldiven (EN 388)", icon: "🧤", category: "el" },
+          
+          { id: "dokumcu_botu", name: "Dökümcü Botu (EN 20349)", icon: "👢", category: "isi" },
+          { id: "alumunize_kiyafet", name: "Alüminize Kıyafet (ISO 11612)", icon: "👨‍🚀", category: "isi" },
+          { id: "isi_eldiveni", name: "Isıya Dayanıklı Eldiven (EN 407)", icon: "🧤", category: "isi" },
+          { id: "yuz_siperligi", name: "Yüz Siperliği / Vizör", icon: "🛡️", category: "isi" },
+          
+          { id: "gaz_dedektoru", name: "Çoklu Gaz Dedektörü", icon: "📟", category: "kapali_alan" },
+          { id: "temiz_hava_maskesi", name: "Temiz Hava/Kaçış Maskesi", icon: "🤿", category: "kapali_alan" },
+          { id: "kafa_feneri", name: "Ex-Proof Kafa Feneri", icon: "🔦", category: "kapali_alan" },
+          { id: "tripod_vinc", name: "Tripod ve Vinç Sistemi", icon: "🏗️", category: "kapali_alan" },
+          
+          { id: "parasut_kemer", name: "Paraşüt Tipi Kemer (EN 361)", icon: "🧗", category: "yuksekte" },
+          { id: "cift_kollu_lanyard", name: "Çift Kollu Lanyard (EN 355)", icon: "🔗", category: "yuksekte" },
+          
+          { id: "tam_yuz_maske", name: "Tam Yüz Gaz Maskesi (EN 136)", icon: "😷", category: "kimyasal" },
+          { id: "kimyasal_eldiven", name: "Kimyasal Eldiven (EN 374)", icon: "🧤", category: "kimyasal" },
+          { id: "kivilcim_cikarmaz", name: "Kıvılcım Çıkarmayan Aletler", icon: "🔧", category: "kimyasal" },
+          { id: "kimyasal_tulum", name: "Kimyasal Tulum (Tip 3/4)", icon: "🧑‍🔬", category: "kimyasal" },
+          
+          { id: "deri_onluk", name: "Deri Kaynakçı Önlüğü (EN 470)", icon: "🥼", category: "kaynak" },
+          { id: "kaynakci_maskesi", name: "Kaynakçı Maskesi (EN 175)", icon: "🎭", category: "kaynak" },
+          { id: "kaynakci_eldiveni", name: "Kaynak Eldiveni (EN 12477)", icon: "🧤", category: "kaynak" },
+          { id: "toz_maskesi", name: "Toz Maskesi (EN 149 FFP3)", icon: "😷", category: "kaynak" },
+          
+          { id: "izole_eldiven", name: "Yalıtkan Eldiven (EN 60903)", icon: "⚡", category: "elektrik" },
+          { id: "izole_paspas", name: "Yalıtkan Paspas / Ayakkabı", icon: "🟫", category: "elektrik" },
+          { id: "ark_siperlik", name: "Ark Koruyucu Siperlik", icon: "🛡️", category: "elektrik" },
+          
+          { id: "telsiz", name: "Telsiz / Düdük", icon: "📻", category: "diger" },
+          { id: "celik_tabanli_cizme", name: "Çelik Tabanlı Çizme (S5)", icon: "👢", category: "diger" },
+          { id: "kulaklik", name: "Kulaklık (EN 352)", icon: "🎧", category: "diger" },
+          { id: "dozimetre", name: "Kişisel Dozimetre", icon: "🎛️", category: "diger" },
+          { id: "uyari_seridi", name: "Radyasyon Uyarı Şeridi", icon: "🚧", category: "diger" }
+        ];
+
+        // --- SENARYOLAR ---
+        const scenarios = [
+          { 
+            id: 1, 
+            title: "Yüksek Fırın - Döküm Platformu", 
+            description: "İSDEMİR Yüksek Fırın müdahale ekibindesin. 3. döküm kanalında ergimiş maden akışı sırasında numune alman ve cüruf temizliği yapman gerekiyor. Ortamda yoğun radyant ısı ve sıvı metal sıçrama riski var.", 
+            requiredItems: ["baret", "is_elbisesi", "gozluk", "alumunize_kiyafet", "dokumcu_botu", "isi_eldiveni", "yuz_siperligi"], 
+            hint: "Standart donanımlardan Baret, İş Elbisesi ve Gözlüğü unutma! Sıvı metal olan bir ortamda standart iş botu yerine EN 20349 Dökümcü Botu seçmelisin. Ayrıca ısıya karşı Alüminize set, Isı eldiveni ve Yüz Siperliği şarttır.",
+            theme: "bg-orange-100 border-orange-200", icon: "🔥" 
+          },
+          { 
+            id: 2, 
+            title: "Enerji Tesisleri - Yeraltı Kablo Galerisi", 
+            description: "Enerji Dağıtım Müdürlüğü'ne bağlı, yerin 5 metre altındaki kablo galerisinde (tünel) yüksek gerilim kablo tavalarını değiştireceksin. Tünel uzun, dar ve havalandırması sınırlı.", 
+            requiredItems: ["baret", "is_botu", "is_elbisesi", "gozluk", "gaz_dedektoru", "temiz_hava_maskesi", "kafa_feneri", "tripod_vinc"], 
+            hint: "Standart 4'lüyü (Baret, Bot, Elbise, Gözlük) seç. İSDEMİR şartnamesine göre Kapalı Alanlarda çalışırken gaz birikimi için Çoklu Gaz Dedektörü ve Temiz Hava Maskesi şarttır. Karanlık için Ex-Proof Fener ve acil kurtarma için giriş ağzında Tripod/Vinç bulunmalıdır.",
+            theme: "bg-slate-200 border-slate-300", icon: "🕳️" 
+          },
+          { 
+            id: 3, 
+            title: "Çelikhane - Tavan Vinci Bakımı", 
+            description: "Çelikhane binasının tavanında, 25 metre yükseklikteki gezer vinç (kreyn) yürüme yolunda, vinç raylarının bağlantı civatalarını torklayacaksın.", 
+            requiredItems: ["baret", "is_botu", "is_elbisesi", "gozluk", "mekanik_eldiven", "parasut_kemer", "cift_kollu_lanyard"], 
+            hint: "Standart 4'lüyü seç. Civata sıkacağın için mekanik eldiven (EN 388) gerekli. Yüksekte yürüme yolunda ilerlerken sürekli %100 bağlı kalabilmek için Paraşüt Tipi Kemer ve Çift Kollu Lanyard (EN 355) seçmelisin.",
+            theme: "bg-sky-100 border-sky-200", icon: "🏗️" 
+          },
+          { 
+            id: 4, 
+            title: "Kok Fabrikası - Gaz Hattı Flanş Sökümü", 
+            description: "Kok Bataryaları bölgesinde, içinde Kok Gazı (COG) geçen hattın vanasında kaçak var. Hattı körleyip contayı değiştireceksin. Gaz oldukça zehirli ve yanıcıdır.", 
+            requiredItems: ["baret", "is_botu", "is_elbisesi", "tam_yuz_maske", "kimyasal_eldiven", "kivilcim_cikarmaz", "gaz_dedektoru"], 
+            hint: "Standart 3'lüyü seç (Gözlüğe gerek yok çünkü Tam Yüz Maskesi kullanacaksın). Zehirli gazdan korunmak için Tam Yüz Gaz Maskesi ve Kimyasal Eldiven şart. Ortam ölçümü için Dedektör ve patlamayı önlemek için Kıvılcım Çıkarmayan Aletler almalısın.",
+            theme: "bg-lime-100 border-lime-200", icon: "🧪" 
+          },
+          { 
+            id: 5, 
+            title: "Liman - Vinç Altında İşaretçilik", 
+            description: "İSDEMİR Liman sahasında gemiden kütük demir (billet) tahliyesi yapılıyor. Sen vinç operatörüne sapanları bağlayıp işaret vererek yükü yönlendireceksin.", 
+            requiredItems: ["baret", "is_botu", "is_elbisesi", "gozluk", "mekanik_eldiven", "telsiz"], 
+            hint: "Standart 4'lüyü mutlaka seç. Sapan tellerinin elini kesmemesi için Mekanik Eldiven ve operatörle gürültülü ortamda haberleşmek için Telsiz/Düdük gerekli.",
+            theme: "bg-cyan-100 border-cyan-200", icon: "🚢" 
+          },
+          { 
+            id: 6, 
+            title: "Merkez Bakım - Kaynak İşleri", 
+            description: "Merkez Atölyesinde büyük bir fan gövdesinin çatlaklarını elektrik ark kaynağı ile tamir edeceksin.", 
+            requiredItems: ["baret", "is_botu", "is_elbisesi", "gozluk", "deri_onluk", "kaynakci_maskesi", "kaynakci_eldiveni", "toz_maskesi"], 
+            hint: "Standart 4'lüyü seç. Ark kaynağından çıkan UV ışını, duman ve cürufa karşı Deri Önlük, Kaynakçı Maskesi, Kaynak Eldiveni ve FFP3 Toz/Duman Maskesi kullanmalısın.",
+            theme: "bg-rose-100 border-rose-200", icon: "🔥" 
+          },
+          { 
+            id: 7, 
+            title: "Asit Rejenerasyon - Asit Tankı Müdahalesi", 
+            description: "Hidroklorik asit (HCL) tankının seviye göstergesinde arıza var. Asit buharının ve sıçrama diskinin yoğun olduğu bir bölgede çalışacaksın.", 
+            requiredItems: ["baret", "kimyasal_tulum", "tam_yuz_maske", "kimyasal_eldiven", "celik_tabanli_cizme"], 
+            hint: "Sadece Baret al. İş elbisesi ve botu yerine asit geçirmeyen Kimyasal Tulum (Tip 3/4) ve Çelik Tabanlı Çizme (S5) seçmelisin. Ayrıca asit buharı için Tam Yüz Maskesi ve Kimyasal Eldiven kullan.",
+            theme: "bg-fuchsia-100 border-fuchsia-200", icon: "☢️" 
+          },
+          { 
+            id: 8, 
+            title: "Elektrik Dağıtım - OG Hücre Bakımı", 
+            description: "34.5 kV Orta Gerilim hücresinde manevra yapacak ve kesiciyi açacaksın. Enerji altında çalışma ve ark patlaması riski var.", 
+            requiredItems: ["baret", "is_botu", "is_elbisesi", "gozluk", "izole_eldiven", "izole_paspas", "ark_siperlik"], 
+            hint: "Standart 4'lüyü seç. İSDEMİR Elektrik kurallarına göre voltaja uygun İzole (Yalıtkan) Eldiven, İzole Paspas/Ayakkabı ve patlamaya karşı Ark Koruyucu Yüz Siperliği zorunludur.",
+            theme: "bg-yellow-100 border-yellow-200", icon: "⚡" 
+          },
+          { 
+            id: 9, 
+            title: "İnşaat - Derin Kazı ve Kalıp Çakma", 
+            description: "Yeni haddehane temeli için 3 metre derinliğinde kazı alanında kalıp çakıyorsun. Zemin çok çamurlu, çivili tahtalar var ve yukarıda iş makinesi çalışıyor.", 
+            requiredItems: ["baret", "is_elbisesi", "gozluk", "mekanik_eldiven", "celik_tabanli_cizme", "toz_maskesi", "kulaklik"], 
+            hint: "Baret, Elbise, Gözlük seç. Ancak çamur ve çivi riskinden dolayı standart bot yerine Çelik Tabanlı Çizme (S5) seçmelisin. Kalıp çakmak için mekanik eldiven, toz için maske, gürültü için kulaklık şart.",
+            theme: "bg-stone-200 border-stone-300", icon: "🚧" 
+          },
+          { 
+            id: 10, 
+            title: "Otomasyon - Radyografik Muayene Sahası", 
+            description: "Boru hatlarının kaynakları NDT (Radyografi) ile kontrol ediliyor. Sen de o bölgenin hemen sınırında acil bir otomasyon kablosu çekeceksin.", 
+            requiredItems: ["baret", "is_botu", "is_elbisesi", "gozluk", "mekanik_eldiven", "dozimetre", "uyari_seridi"], 
+            hint: "Standart 4'lü ve kablo işi için mekanik eldiveni seç. İSDEMİR Şartnamesi X.4 maddesi gereği radyasyon bölgesinde mutlaka Kişisel Dozimetre taşımalı ve alanı Uyarı Şeridi ile belirlemelisin.",
+            theme: "bg-emerald-100 border-emerald-200", icon: "☢️" 
+          }
+        ];
+
+        // --- UYGULAMA (COMPONENT) ---
+        function App() {
+          const [currentScenarioIndex, setCurrentScenarioIndex] = useState(0);
+          const [equippedItems, setEquippedItems] = useState([]);
+          const [feedback, setFeedback] = useState(null);
+          const [score, setScore] = useState(0);
+          const [gameOver, setGameOver] = useState(false);
+          const [showHint, setShowHint] = useState(false);
+
+          const currentScenario = scenarios[currentScenarioIndex];
+
+          // Sonraki senaryoya geçerken ipucunu kapat
+          useEffect(() => {
+            setShowHint(false);
+          }, [currentScenarioIndex]);
+
+          const toggleEquip = (itemId) => {
+            if (feedback?.type === 'success') return; // Geçtiyse değiştirmeyi engelle
+            setEquippedItems(prev => 
+              prev.includes(itemId) 
+                ? prev.filter(id => id !== itemId)
+                : [...prev, itemId]
+            );
+            setFeedback(null);
+          };
+
+          const checkEquipment = () => {
+            const required = currentScenario.requiredItems;
+            
+            // Kullanıcının seçtikleri arasında eksik var mı?
+            const missingItems = required.filter(item => !equippedItems.includes(item));
+            
+            // Kullanıcının seçtikleri arasında gereksiz (fazla) var mı?
+            const extraItems = equippedItems.filter(item => !required.includes(item));
+
+            if (missingItems.length === 0 && extraItems.length === 0) {
+              setFeedback({ type: 'success', message: 'Tebrikler! İSDEMİR standartlarına uygun, eksiksiz ve tam donanım sağladın.' });
+              setScore(prev => prev + 100);
+            } else if (missingItems.length > 0 && extraItems.length === 0) {
+              setFeedback({ type: 'warning', message: `Eksik donanımların var. Lütfen riskleri tekrar gözden geçir. (İstersen İpucu alabilirsin)` });
+            } else if (missingItems.length === 0 && extraItems.length > 0) {
+              setFeedback({ type: 'warning', message: 'Gereksiz donanımlar seçtin. Sahada gereksiz ağırlık ve hareket kısıtlılığı tehlike yaratır!' });
+            } else {
+              setFeedback({ type: 'error', message: 'Hem eksik hem de yanlış donanımlar var. Lütfen riskleri ve standartları tekrar oku.' });
+            }
+          };
+
+          const nextScenario = () => {
+            if (currentScenarioIndex < scenarios.length - 1) {
+              setCurrentScenarioIndex(prev => prev + 1);
+              setEquippedItems([]);
+              setFeedback(null);
+            } else {
+              setGameOver(true);
+            }
+          };
+
+          const restartGame = () => {
+            setCurrentScenarioIndex(0);
+            setEquippedItems([]);
+            setFeedback(null);
+            setScore(0);
+            setGameOver(false);
+          };
+
+          if (gameOver) {
+            return (
+              <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans">
+                <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border-t-8 border-indigo-600">
+                  <div className="bg-indigo-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <ShieldCheck className="w-12 h-12 text-indigo-600" />
+                  </div>
+                  <h1 className="text-3xl font-extrabold text-slate-800 mb-2">OYUN TAMAMLANDI!</h1>
+                  <p className="text-slate-600 mb-6 font-medium">Tüm senaryoları tamamladın ve İSDEMİR İSG Şartnamesine hakim olduğunu kanıtladın.</p>
+                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl mb-6">
+                    <span className="block text-xs text-slate-400 uppercase tracking-widest font-bold mb-1">TOPLAM PUAN</span>
+                    <span className="text-5xl font-black text-indigo-600">{score}</span>
+                  </div>
+                  <button onClick={restartGame} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-4 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg">
+                    <RotateCcw className="w-5 h-5" /> Yeniden Oyna
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
+              
+              {/* ÜST BİLGİ ALANI (HEADER) */}
+              <header className="flex flex-col md:flex-row md:items-center justify-between bg-slate-900 text-white p-5 rounded-2xl shadow-lg gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="bg-white/10 p-3 rounded-xl border border-white/20">
+                    <ShieldCheck className="w-8 h-8 text-orange-400" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-black tracking-wide text-white">ERDEMİR <span className="text-orange-400">MÜHENDİSLİK</span></h1>
+                    <p className="text-slate-400 text-sm font-medium">Önce Standartları Giy, Sonra İşe Özel Donanımı Seç!</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-center">
+                  <div className="bg-white/10 border border-white/10 px-5 py-2 rounded-xl">
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Seviye</span>
+                    <span className="text-xl font-bold">{currentScenarioIndex + 1} <span className="text-slate-500 text-sm">/ {scenarios.length}</span></span>
+                  </div>
+                  <div className="bg-orange-500/20 border border-orange-500/30 px-5 py-2 rounded-xl">
+                    <span className="block text-[10px] font-bold text-orange-300 uppercase tracking-wider">Puan</span>
+                    <span className="text-xl font-bold text-orange-400">{score}</span>
+                  </div>
+                </div>
+              </header>
+
+              <div className="grid lg:grid-cols-12 gap-6">
+                
+                {/* SOL KOLON: Senaryo ve Seçili Eşyalar */}
+                <div className="lg:col-span-5 space-y-6">
+                  
+                  {/* Senaryo Kartı */}
+                  <div className={`${currentScenario.theme} p-6 rounded-2xl shadow-sm border relative overflow-hidden transition-colors duration-500`}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="text-4xl bg-white/60 p-2 rounded-xl shadow-sm">{currentScenario.icon}</span>
+                      <h2 className="text-xl font-extrabold text-slate-800 leading-tight">{currentScenario.title}</h2>
+                    </div>
+                    <p className="text-slate-700 font-medium leading-relaxed mb-5">
+                      {currentScenario.description}
+                    </p>
+                    
+                    {/* İpucu Alanı */}
+                    <div className="mt-4 border-t border-black/10 pt-4">
+                      {!showHint ? (
+                        <button 
+                          onClick={() => setShowHint(true)}
+                          className="flex items-center gap-2 text-sm font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-lg transition-colors"
+                        >
+                          <Lightbulb className="w-5 h-5" /> İpucu Al
+                        </button>
+                      ) : (
+                        <div className="bg-white/80 p-4 rounded-xl border border-indigo-200 text-sm font-medium text-indigo-900 animate-fade-in-up flex gap-3 shadow-sm">
+                          <Lightbulb className="w-6 h-6 shrink-0 text-orange-500" />
+                          <p>{currentScenario.hint}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* İşçinin Üzerindekiler */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 min-h-[300px] flex flex-col relative">
+                    <h3 className="text-lg font-black text-slate-800 mb-4 flex justify-between items-center border-b pb-3">
+                      <span className="flex items-center gap-2">🧍 Seçilen Donanımlar</span>
+                      <span className="bg-slate-100 text-slate-600 text-xs px-3 py-1 rounded-full font-bold">{equippedItems.length} Adet</span>
+                    </h3>
+                    
+                    <div className="flex-1 bg-slate-50 rounded-xl border-2 border-dashed border-slate-300 p-4 flex flex-wrap content-start gap-3">
+                      {equippedItems.length === 0 ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                          <span className="text-5xl mb-3 opacity-50">👕</span>
+                          <p className="text-sm font-bold">Personel şu an korumasız!</p>
+                          <p className="text-xs text-center mt-1">Önce standartları, sonra işe özel olanları sağdaki menüden seçin.</p>
+                        </div>
+                      ) : (
+                        equippedItems.map(itemId => {
+                          const item = allItems.find(i => i.id === itemId);
+                          return (
+                            <div key={item.id} className="bg-white border-2 border-slate-200 shadow-sm rounded-xl p-3 flex flex-col items-center justify-center w-[90px] h-[90px] relative group animate-fade-in-up hover:border-red-300 transition-colors">
+                              <span className="text-3xl mb-1">{item.icon}</span>
+                              <span className="text-[9px] font-bold text-center leading-tight text-slate-700">{item.name}</span>
+                              <button 
+                                onClick={() => toggleEquip(item.id)} 
+                                className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-500 hover:text-white" 
+                                title="Çıkar"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* SAĞ KOLON: Envanter ve Kontrol */}
+                <div className="lg:col-span-7 flex flex-col gap-6">
+                  
+                  {/* Donanım Deposu */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden h-full">
+                    <div className="bg-slate-800 p-4 text-white">
+                      <h3 className="text-lg font-black tracking-wide flex items-center gap-2">
+                        📦 DONANIM DEPOSU
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">İlgili donanıma tıklayarak personele giydiriniz.</p>
+                    </div>
+                    
+                    <div className="p-4 overflow-y-auto h-[400px] inventory-scroll bg-slate-50">
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                        {allItems.map(item => {
+                          const isEquipped = equippedItems.includes(item.id);
+                          // Standart öğeler için farklı border stili
+                          const isStandard = item.category === 'standart';
+                          
+                          return (
+                            <button 
+                              key={item.id} 
+                              onClick={() => toggleEquip(item.id)} 
+                              className={`
+                                relative p-3 rounded-xl border-2 transition-all duration-200 flex flex-col items-center text-center gap-2 group hover:shadow-md
+                                ${isEquipped 
+                                  ? 'border-indigo-600 bg-indigo-50 shadow-inner' 
+                                  : isStandard 
+                                    ? 'border-orange-200 bg-white hover:border-orange-400' 
+                                    : 'border-slate-200 bg-white hover:border-indigo-300'
+                                }
+                              `}
+                            >
+                              <span className={`text-3xl transition-transform ${isEquipped ? 'scale-110' : 'group-hover:scale-110'}`}>{item.icon}</span>
+                              <span className={`text-[10px] font-bold leading-tight ${isEquipped ? 'text-indigo-800' : 'text-slate-600'}`}>{item.name}</span>
+                              {isEquipped && (
+                                <div className="absolute top-2 right-2 text-indigo-600 bg-white rounded-full">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </div>
+                              )}
+                              {isStandard && !isEquipped && (
+                                <div className="absolute top-1 left-1 text-[8px] bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded font-bold">STD</div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Geri Bildirim ve Butonlar */}
+                  <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    {feedback && (
+                      <div className={`p-4 rounded-xl flex gap-3 items-start animate-fade-in mb-4 ${
+                        feedback.type === 'success' ? 'bg-green-100 text-green-800 border border-green-300' : 
+                        feedback.type === 'warning' ? 'bg-amber-100 text-amber-800 border border-amber-300' : 
+                        'bg-red-100 text-red-800 border border-red-300'
+                      }`}>
+                        {feedback.type === 'success' ? <CheckCircle2 className="w-6 h-6 shrink-0 mt-0.5" /> : 
+                         feedback.type === 'warning' ? <AlertTriangle className="w-6 h-6 shrink-0 mt-0.5" /> : 
+                         <XCircle className="w-6 h-6 shrink-0 mt-0.5" />}
+                        <p className="font-bold text-sm leading-relaxed">{feedback.message}</p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-3">
+                      {feedback?.type !== 'success' ? (
+                        <button 
+                          onClick={checkEquipment} 
+                          disabled={equippedItems.length === 0} 
+                          className="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black py-4 px-6 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-lg tracking-wide uppercase"
+                        >
+                          <ShieldCheck className="w-6 h-6" /> KONTROL ET
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={nextScenario} 
+                          className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 px-6 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-lg tracking-wide uppercase animate-pulse-once"
+                        >
+                          SONRAKİ SENARYO <ArrowRight className="w-6 h-6" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
